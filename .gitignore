@@ -56,7 +56,6 @@ dist-ssr
 *.sw?
 
 # Frontend specific
-frontend/
 # Dependencies
 node_modules/
 npm-debug.log*
