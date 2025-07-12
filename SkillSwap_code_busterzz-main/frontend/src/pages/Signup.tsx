@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,15 +21,150 @@ const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const [isLoading, setIsLoading] = useState(false);
 
   const indianCities = [
     'Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Kolkata', 'Hyderabad', 
     'Pune', 'Ahmedabad', 'Surat', 'Jaipur', 'Lucknow', 'Kanpur'
   ];
 
-  const handleSignup = (e: React.FormEvent) => {
+  // Test backend connection when component mounts
+  useEffect(() => {
+    const testBackendConnection = async () => {
+      try {
+        console.log('[Frontend] Testing backend connection...');
+        const response = await fetch('http://172.16.91.34:8000/api/signup/health/', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          mode: 'cors',
+        });
+        
+        console.log('[Frontend] Backend test response status:', response.status);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('[Frontend] Backend connection successful:', data);
+          alert(`✅ Backend connected! Database: ${data.database}, Users: ${data.user_count}`);
+        } else {
+          const errorText = await response.text();
+          console.error('[Frontend] Backend test failed:', errorText);
+          alert(`❌ Backend connection failed: ${response.status} - ${errorText}`);
+        }
+      } catch (error) {
+        console.error('[Frontend] Backend test error:', error);
+        alert(`❌ Backend connection error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    };
+
+    testBackendConnection();
+  }, []);
+
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Signup attempt:', formData);
+    
+    // Validate form data
+    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword || !formData.location) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      alert('Passwords do not match');
+      return;
+    }
+
+    if (!formData.acceptTerms) {
+      alert('Please accept the terms and conditions');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      console.log('[Frontend] Sending signup request...');
+      
+      // Prepare the data for the backend
+      const signupData = {
+        username: formData.email.split('@')[0], // Use email prefix as username
+        email: formData.email,
+        password: formData.password,
+        password_confirm: formData.confirmPassword,
+        first_name: formData.name.split(' ')[0], // First part of name
+        last_name: formData.name.split(' ').slice(1).join(' ') || '', // Rest of name
+      };
+
+      console.log('[Frontend] Signup data:', signupData);
+
+      const response = await fetch('http://172.16.91.34:8000/api/auth/register/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        mode: 'cors',
+        credentials: 'include',
+        body: JSON.stringify(signupData),
+      });
+
+      console.log('[Frontend] Signup response status:', response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[Frontend] Signup successful:', data);
+        alert(`✅ Account created successfully! Welcome ${data.user.first_name}!`);
+        
+        // Clear the form
+        setFormData({
+          name: '',
+          email: '',
+          password: '',
+          confirmPassword: '',
+          location: '',
+          acceptTerms: false
+        });
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[Frontend] Signup failed:', errorData);
+        alert(`❌ Registration failed: ${errorData.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('[Frontend] Signup error:', error);
+      alert(`❌ Signup error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const testConnection = async () => {
+    try {
+      console.log('[Frontend] Manual backend test started...');
+      const response = await fetch('http://172.16.91.34:8000/api/signup/health/', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+      });
+      
+      console.log('[Frontend] Manual test response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[Frontend] Manual test successful:', data);
+        alert(`✅ Manual test successful! Database: ${data.database}, Users: ${data.user_count}`);
+      } else {
+        const errorText = await response.text();
+        console.error('[Frontend] Manual test failed:', errorText);
+        alert(`❌ Manual test failed: ${response.status} - ${errorText}`);
+      }
+    } catch (error) {
+      console.error('[Frontend] Manual test error:', error);
+      alert(`❌ Manual test error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   return (
@@ -182,9 +316,19 @@ const Signup = () => {
               <Button 
                 type="submit" 
                 className="w-full h-12 text-base font-medium bg-gradient-to-r from-teal-500 to-indigo-600 hover:from-teal-600 hover:to-indigo-700"
-                disabled={!formData.acceptTerms}
+                disabled={!formData.acceptTerms || isLoading}
               >
-                Create Account
+                {isLoading ? "Creating Account..." : "Create Account"}
+              </Button>
+              
+              {/* Test Connection Button */}
+              <Button 
+                type="button" 
+                variant="outline"
+                onClick={testConnection}
+                className="w-full h-12 text-base"
+              >
+                Test Backend Connection
               </Button>
               
               <div className="text-center space-y-4">
