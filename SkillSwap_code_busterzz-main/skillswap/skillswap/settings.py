@@ -47,11 +47,30 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    # 'django.middleware.csrf.CsrfViewMiddleware',  # Temporarily disabled for development
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'core.middleware.SessionActivityMiddleware',  # Custom session activity middleware
+    'core.middleware.SessionTimeoutMiddleware',   # Custom session timeout middleware
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# CSRF settings
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://172.16.91.34:5173",
+    "http://172.16.91.34:3000",
+    "http://172.16.91.34:4173",
+    "http://172.16.91.34:8080",
+]
+
+# Disable CSRF for API endpoints in development
+CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_HTTPONLY = False
+CSRF_USE_SESSIONS = False
+CSRF_COOKIE_NAME = None
+CSRF_HEADER_NAME = None
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
@@ -137,7 +156,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',  # Changed from IsAuthenticated
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
@@ -194,3 +213,51 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Session settings for authentication
+SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
+SESSION_COOKIE_HTTPONLY = False  # Allow JavaScript access for debugging
+SESSION_COOKIE_SAMESITE = 'Lax'  # Allow cross-site requests in development
+SESSION_COOKIE_AGE = 1800  # 30 minutes in seconds
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # Session expires when browser closes
+SESSION_COOKIE_DOMAIN = None  # Allow all domains in development
+SESSION_COOKIE_PATH = '/'  # Set cookie path to root
+
+# Session engine
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+
+# Force session creation and save on every request
+SESSION_SAVE_EVERY_REQUEST = True
+
+# Additional cookie settings for development
+SESSION_COOKIE_NAME = 'sessionid'
+
+# Session timeout settings
+SESSION_IDLE_TIMEOUT = 1800  # 30 minutes of inactivity
+
+# Logging configuration for debugging
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'core': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}

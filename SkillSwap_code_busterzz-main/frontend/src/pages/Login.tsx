@@ -1,6 +1,6 @@
 
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,11 +12,127 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  // Test backend connection on component mount
+  useEffect(() => {
+    const testBackendConnection = async () => {
+      try {
+        console.log('[Frontend] Testing backend connection for login...');
+        const response = await fetch('http://172.16.91.34:8000/api/health/', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          mode: 'cors',
+        });
+        
+        console.log('[Frontend] Login page backend test response status:', response.status);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('[Frontend] Login page backend connection successful:', data);
+        } else {
+          console.error('[Frontend] Login page backend test failed');
+        }
+      } catch (error) {
+        console.error('[Frontend] Login page backend test error:', error);
+      }
+    };
+
+    testBackendConnection();
+  }, []);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Login attempt:', { email, password });
+    
+    // Validate form data
+    if (!email || !password) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      console.log('[Frontend] Sending login request...');
+      
+      // Prepare the data for the backend
+      const loginData = {
+        username: email, // Django auth uses username field
+        password: password,
+      };
+
+      console.log('[Frontend] Login data being sent:', { username: email, password: '***' });
+
+      const response = await fetch('http://172.16.91.34:8000/api/auth/login/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        mode: 'cors',
+        credentials: 'include',
+        body: JSON.stringify(loginData),
+      });
+
+      console.log('[Frontend] Login response status:', response.status);
+      console.log('[Frontend] Login response headers:', Object.fromEntries(response.headers.entries()));
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[Frontend] Login successful:', data);
+        alert(`✅ Welcome back, ${data.user.first_name}!`);
+        
+        // Clear the form
+        setEmail('');
+        setPassword('');
+        
+        // Redirect to dashboard
+        navigate('/dashboard');
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[Frontend] Login failed:', errorData);
+        alert(`❌ Login failed: ${errorData.message || 'Invalid credentials'}`);
+      }
+    } catch (error) {
+      console.error('[Frontend] Login error:', error);
+      alert(`❌ Login error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const testConnection = async () => {
+    try {
+      console.log('[Frontend] Manual login backend test started...');
+      const response = await fetch('http://172.16.91.34:8000/api/health/', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+      });
+      
+      console.log('[Frontend] Manual login test response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[Frontend] Manual login test successful:', data);
+        alert(`✅ Login backend connected! Status: ${data.status}`);
+      } else {
+        const errorText = await response.text();
+        console.error('[Frontend] Manual login test failed:', errorText);
+        alert(`❌ Login backend test failed: ${response.status} - ${errorText}`);
+      }
+    } catch (error) {
+      console.error('[Frontend] Manual login test error:', error);
+      alert(`❌ Login backend test error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   return (
@@ -103,8 +219,22 @@ const Login = () => {
                 </div>
               </div>
               
-              <Button type="submit" className="w-full h-12 text-base font-medium bg-gradient-to-r from-teal-500 to-indigo-600 hover:from-teal-600 hover:to-indigo-700">
-                Sign In
+              <Button 
+                type="submit" 
+                className="w-full h-12 text-base font-medium bg-gradient-to-r from-teal-500 to-indigo-600 hover:from-teal-600 hover:to-indigo-700"
+                disabled={isLoading}
+              >
+                {isLoading ? "Signing In..." : "Sign In"}
+              </Button>
+              
+              {/* Test Connection Button */}
+              <Button 
+                type="button" 
+                variant="outline"
+                onClick={testConnection}
+                className="w-full h-12 text-base"
+              >
+                Test Backend Connection
               </Button>
               
               <div className="text-center space-y-4">

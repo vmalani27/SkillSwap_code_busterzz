@@ -16,6 +16,12 @@ export interface User {
   date_joined: string;
 }
 
+export interface UserProfile extends User {
+  offered_skills: Skill[];
+  wanted_skills: Skill[];
+  skill_count: number;
+}
+
 export interface Skill {
   id: number;
   name: string;
@@ -69,253 +75,161 @@ export interface SignupHealthCheckResponse {
   timestamp: string;
 }
 
+// Mock user data for a barter system
+const MOCK_USER = {
+  id: 1,
+  username: "barterer1",
+  email: "barterer1@example.com",
+  first_name: "Alex",
+  last_name: "Smith",
+  location: "Bartertown",
+  availability: "Evenings",
+  profile_photo: null,
+  is_public: true,
+  rating: 4.8,
+  bio: "I love exchanging services and skills!",
+  date_joined: "2024-01-01T00:00:00Z",
+  offered_skills: [
+    { id: 1, name: "Logo Design" },
+    { id: 2, name: "Guitar Lessons" }
+  ],
+  wanted_skills: [
+    { id: 3, name: "Plumbing Repair" },
+    { id: 4, name: "Dog Walking" }
+  ],
+  skill_count: 4,
+};
+
+const MOCK_SKILLS = [
+  { id: 1, name: "Logo Design" },
+  { id: 2, name: "Guitar Lessons" },
+  { id: 3, name: "Plumbing Repair" },
+  { id: 4, name: "Dog Walking" },
+  { id: 5, name: "Baking" },
+  { id: 6, name: "Car Wash" },
+];
+
+const MOCK_USER_SKILLS = [
+  { id: 1, skill: MOCK_SKILLS[0], skill_id: 1, is_offered: true }, // Logo Design (offered)
+  { id: 2, skill: MOCK_SKILLS[2], skill_id: 3, is_offered: false }, // Plumbing Repair (wanted)
+];
+
+const MOCK_SWAP_REQUESTS = [
+  {
+    id: 1,
+    sender: MOCK_USER,
+    receiver: { ...MOCK_USER, id: 2, username: "barterer2", email: "barterer2@example.com", first_name: "Jamie", offered_skills: [{ id: 3, name: "Plumbing Repair" }], wanted_skills: [{ id: 1, name: "Logo Design" }] },
+    sender_skill: MOCK_SKILLS[0], // Alex offers Logo Design
+    receiver_skill: MOCK_SKILLS[2], // Wants Plumbing Repair from Jamie
+    sender_skill_id: 1,
+    receiver_skill_id: 3,
+    message: "I'll design your logo if you fix my sink!",
+    status: "pending",
+    created_at: "2024-01-01T12:00:00Z",
+  },
+  {
+    id: 2,
+    sender: { ...MOCK_USER, id: 2, username: "barterer2", email: "barterer2@example.com", first_name: "Jamie", offered_skills: [{ id: 3, name: "Plumbing Repair" }], wanted_skills: [{ id: 1, name: "Logo Design" }] },
+    receiver: MOCK_USER,
+    sender_skill: MOCK_SKILLS[2], // Jamie offers Plumbing Repair
+    receiver_skill: MOCK_SKILLS[0], // Wants Logo Design from Alex
+    sender_skill_id: 3,
+    receiver_skill_id: 1,
+    message: "I'll fix your sink if you design my logo!",
+    status: "accepted",
+    created_at: "2024-01-02T15:30:00Z",
+  },
+];
+
 // API Client
 class ApiClient {
-  private baseURL: string;
-
-  constructor(baseURL: string) {
-    this.baseURL = baseURL;
+  async getCurrentUser() {
+    return MOCK_USER;
   }
-
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const url = `${this.baseURL}${endpoint}`;
-    
-    const config: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      credentials: 'include', // Include cookies for session authentication
-      ...options,
-    };
-
-    const response = await fetch(url, config);
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-    }
-
-    return response.json();
+  async updateProfile(data: Partial<typeof MOCK_USER>) {
+    return { ...MOCK_USER, ...data };
   }
-
-  // Health Check
-  async healthCheck(): Promise<HealthCheckResponse> {
-    const url = `${this.baseURL}/health/`;
-    console.log('[Frontend] Making health check request to:', url);
-    
-    try {
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
-      
-      console.log('[Frontend] Health check response status:', response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[Frontend] Health check failed with status:', response.status, 'Error:', errorText);
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('[Frontend] Health check successful response:', data);
-      return data;
-    } catch (error) {
-      console.error('[Frontend] Health check request failed:', error);
-      throw error;
-    }
+  async getUserProfile(id: number) {
+    return MOCK_USER;
   }
-
-  // Signup Health Check
-  async signupHealthCheck(): Promise<SignupHealthCheckResponse> {
-    const url = `${this.baseURL}/signup/health/`;
-    console.log('[Frontend] Making signup health check request to:', url);
-    console.log('[Frontend] Current API base URL:', this.baseURL);
-    
-    try {
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        mode: 'cors',
-        credentials: 'include',
-      });
-      
-      console.log('[Frontend] Signup health check response status:', response.status);
-      console.log('[Frontend] Response headers:', Object.fromEntries(response.headers.entries()));
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[Frontend] Signup health check failed with status:', response.status, 'Error:', errorText);
-        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
-      }
-      
-      const data = await response.json();
-      console.log('[Frontend] Signup health check successful response:', data);
-      return data;
-    } catch (error) {
-      console.error('[Frontend] Signup health check request failed:', error);
-      console.error('[Frontend] Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
-        url: url,
-        baseURL: this.baseURL
-      });
-      throw error;
-    }
+  async getUsers() {
+    return [
+      MOCK_USER,
+      { ...MOCK_USER, id: 2, username: "barterer2", email: "barterer2@example.com", first_name: "Jamie", offered_skills: [{ id: 3, name: "Plumbing Repair" }], wanted_skills: [{ id: 1, name: "Logo Design" }] },
+    ];
   }
-
-  // Authentication
-  async login(credentials: LoginCredentials): Promise<{ user: User; message: string }> {
-    return this.request('/auth/login/', {
-      method: 'POST',
-      body: JSON.stringify(credentials),
-    });
+  async getUser(id: number) {
+    return MOCK_USER;
   }
-
-  async register(data: RegisterData): Promise<{ user: User; message: string }> {
-    return this.request('/auth/register/', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+  async searchUsers() {
+    return [MOCK_USER];
   }
-
-  async logout(): Promise<{ message: string }> {
-    return this.request('/auth/logout/', {
-      method: 'POST',
-    });
+  async getUserSkills(userId: number) {
+    return MOCK_USER_SKILLS;
   }
-
-  // User Management
-  async getCurrentUser(): Promise<User> {
-    return this.request('/users/profile/');
+  async getSkills() {
+    return MOCK_SKILLS;
   }
-
-  async updateProfile(data: Partial<User>): Promise<User> {
-    return this.request('/users/profile/', {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
+  async createSkill(data: { name: string }) {
+    return { id: MOCK_SKILLS.length + 1, name: data.name };
   }
-
-  async getUsers(params?: { location?: string; skill?: string }): Promise<User[]> {
-    const searchParams = new URLSearchParams();
-    if (params?.location) searchParams.append('location', params.location);
-    if (params?.skill) searchParams.append('skill', params.skill);
-    
-    const queryString = searchParams.toString();
-    const endpoint = queryString ? `/users/?${queryString}` : '/users/';
-    
-    return this.request(endpoint);
+  async getSkill(id: number) {
+    return MOCK_SKILLS.find(s => s.id === id) || MOCK_SKILLS[0];
   }
-
-  async getUser(id: number): Promise<User> {
-    return this.request(`/users/${id}/`);
+  async getUserSkillList() {
+    return MOCK_USER_SKILLS;
   }
-
-  async searchUsers(query: string): Promise<{ users: User[] }> {
-    return this.request(`/users/search/?q=${encodeURIComponent(query)}`);
+  async createUserSkill(data: { skill_id: number; is_offered: boolean }) {
+    return { id: MOCK_USER_SKILLS.length + 1, skill: MOCK_SKILLS.find(s => s.id === data.skill_id), skill_id: data.skill_id, is_offered: data.is_offered };
   }
-
-  async getUserSkills(userId: number): Promise<UserSkill[]> {
-    return this.request(`/users/${userId}/skills/`);
+  async updateUserSkill(id: number, data: Partial<typeof MOCK_USER_SKILLS[0]>) {
+    return { ...MOCK_USER_SKILLS[0], ...data };
   }
-
-  // Skills
-  async getSkills(): Promise<Skill[]> {
-    return this.request('/skills/');
+  async deleteUserSkill(id: number) {
+    return;
   }
-
-  async createSkill(data: { name: string }): Promise<Skill> {
-    return this.request('/skills/', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+  async getSwapRequests() {
+    return MOCK_SWAP_REQUESTS;
   }
-
-  async getSkill(id: number): Promise<Skill> {
-    return this.request(`/skills/${id}/`);
+  async getSentSwapRequests() {
+    return MOCK_SWAP_REQUESTS;
   }
-
-  // User Skills
-  async getUserSkillList(): Promise<UserSkill[]> {
-    return this.request('/user-skills/');
+  async getReceivedSwapRequests() {
+    return MOCK_SWAP_REQUESTS;
   }
-
-  async createUserSkill(data: { skill_id: number; is_offered: boolean }): Promise<UserSkill> {
-    return this.request('/user-skills/', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+  async createSwapRequest(data: any) {
+    return { ...MOCK_SWAP_REQUESTS[0], ...data, id: MOCK_SWAP_REQUESTS.length + 1 };
   }
-
-  async updateUserSkill(id: number, data: Partial<UserSkill>): Promise<UserSkill> {
-    return this.request(`/user-skills/${id}/`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
+  async updateSwapRequest(id: number, data: { status: 'accepted' | 'rejected' }) {
+    return { ...MOCK_SWAP_REQUESTS[0], ...data };
   }
-
-  async deleteUserSkill(id: number): Promise<void> {
-    return this.request(`/user-skills/${id}/`, {
-      method: 'DELETE',
-    });
+  async getSwapRequest(id: number) {
+    return MOCK_SWAP_REQUESTS[0];
   }
-
-  // Swap Requests
-  async getSwapRequests(): Promise<SwapRequest[]> {
-    return this.request('/swap-requests/');
+  async login() {
+    return { user: MOCK_USER, message: "Login successful" };
   }
-
-  async getSentSwapRequests(): Promise<SwapRequest[]> {
-    return this.request('/swap-requests/sent/');
+  async register() {
+    return { user: MOCK_USER, message: "Registration successful" };
   }
-
-  async getReceivedSwapRequests(): Promise<SwapRequest[]> {
-    return this.request('/swap-requests/received/');
+  async logout() {
+    return { message: "Logout successful" };
   }
-
-  async createSwapRequest(data: {
-    receiver: number;
-    sender_skill_id?: number;
-    receiver_skill_id?: number;
-    message: string;
-  }): Promise<SwapRequest> {
-    return this.request('/swap-requests/', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+  async healthCheck() {
+    return { status: "healthy", message: "Mock health check", timestamp: new Date().toISOString() };
   }
-
-  async updateSwapRequest(id: number, data: { status: 'accepted' | 'rejected' }): Promise<SwapRequest> {
-    return this.request(`/swap-requests/${id}/`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
+  async signupHealthCheck() {
+    return { status: "healthy", message: "Mock signup health check", database: "connected", user_count: 1, timestamp: new Date().toISOString() };
   }
-
-  async getSwapRequest(id: number): Promise<SwapRequest> {
-    return this.request(`/swap-requests/${id}/`);
+  async bulkUpdateUserSkills(skills: Array<{ skill_id: number; is_offered: boolean }>) {
+    return { message: "Skills updated successfully", results: skills.map(s => ({ ...s, skill_name: MOCK_SKILLS.find(sk => sk.id === s.skill_id)?.name || "", created: true })) };
   }
 }
 
 // Create and export API instance
-export const api = new ApiClient(API_BASE_URL);
+export const api = new ApiClient();
 
 // Auth context helper
 export const isAuthenticated = async (): Promise<boolean> => {
-  try {
-    await api.getCurrentUser();
-    return true;
-  } catch {
-    return false;
-  }
+  return true;
 }; 

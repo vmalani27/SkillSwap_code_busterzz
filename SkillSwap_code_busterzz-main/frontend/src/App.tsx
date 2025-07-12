@@ -17,6 +17,8 @@ import SendSwapRequest from "./pages/SendSwapRequest";
 import SwapRequests from "./pages/SwapRequests";
 import Messages from "./pages/Messages";
 import NotFound from "./pages/NotFound";
+import SessionTest from "./pages/SessionTest";
+import SessionManager from "./components/SessionManager";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +30,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <SessionManager />
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/dashboard" element={<Dashboard />} />
@@ -39,6 +42,7 @@ const App = () => (
               <Route path="/send-request/:userId" element={<SendSwapRequest />} />
               <Route path="/swap-requests" element={<SwapRequests />} />
               <Route path="/messages" element={<Messages />} />
+              <Route path="/session-test" element={<SessionTest />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

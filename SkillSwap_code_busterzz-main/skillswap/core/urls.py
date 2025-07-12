@@ -5,6 +5,11 @@ urlpatterns = [
     # Health check
     path('health/', views.health_check, name='health-check'),
     path('signup/health/', views.signup_health_check, name='signup-health-check'),
+    path('session-test/', views.session_test, name='session-test'),
+    path('create-session/', views.create_session, name='create-session'),
+    path('cookie-test/', views.cookie_test, name='cookie-test'),
+    path('auth-test/', views.auth_test, name='auth-test'),
+    path('session-check/', views.session_check, name='session-check'),
     
     # Authentication
     path('auth/register/', views.RegisterView.as_view(), name='register'),
@@ -25,6 +30,7 @@ urlpatterns = [
     # User Skills
     path('user-skills/', views.UserSkillListView.as_view(), name='user-skill-list'),
     path('user-skills/<int:pk>/', views.UserSkillDetailView.as_view(), name='user-skill-detail'),
+    path('user-skills/bulk/', views.bulk_user_skills, name='bulk-user-skills'),
     
     # Swap Requests
     path('swap-requests/', views.SwapRequestListView.as_view(), name='swap-request-list'),

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,6 +22,7 @@ const Signup = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
 
   const indianCities = [
     'Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Kolkata', 'Hyderabad', 
@@ -125,6 +126,9 @@ const Signup = () => {
           location: '',
           acceptTerms: false
         });
+        
+        // Redirect to profile setup page
+        navigate('/profile-setup');
       } else {
         const errorData = await response.json().catch(() => ({}));
         console.error('[Frontend] Signup failed:', errorData);

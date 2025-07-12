@@ -32,27 +32,56 @@ const ProfileSetup = () => {
   useEffect(() => {
     const loadSkills = async () => {
       try {
+        console.log('[Frontend] Loading skills for profile setup...');
         const skillsData = await api.getSkills();
+        console.log('[Frontend] Skills loaded successfully:', skillsData);
         setSkills(skillsData);
       } catch (error) {
-        console.error('Failed to load skills:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load skills. Please refresh the page.",
-          variant: "destructive",
-        });
+        console.error('[Frontend] Failed to load skills:', error);
+        // Don't show error toast, just log it and continue
+        // The user can still complete the profile setup
+        setSkills([]);
       }
     };
 
-    loadSkills();
-  }, [toast]);
+    // Only load skills if user is authenticated
+    if (user && !isLoading) {
+      loadSkills();
+    }
+  }, [user, isLoading]);
 
   // Redirect if not authenticated
   useEffect(() => {
-    if (!user) {
+    if (!user && !isLoading) {
+      // Only redirect if we're not loading and definitely don't have a user
+      console.log('[Frontend] No user found, redirecting to login');
       navigate('/login');
     }
-  }, [user, navigate]);
+  }, [user, isLoading, navigate]);
+
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading profile setup...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state if no user yet
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Setting up your profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleSkillToggle = (skill: { id: number; name: string }) => {
     setSelectedSkills(prev => {
@@ -92,27 +121,21 @@ const ProfileSetup = () => {
   };
 
   const handleComplete = async () => {
-    if (selectedSkills.length === 0) {
-      toast({
-        title: "Skills Required",
-        description: "Please select at least one skill.",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    // Allow completion even without skills - they can add them later
     setIsLoading(true);
 
     try {
       // Update user profile
       await updateUser(formData);
 
-      // Add user skills
-      for (const skill of selectedSkills) {
-        await api.createUserSkill({
-          skill_id: skill.id,
-          is_offered: skill.is_offered
-        });
+      // Add user skills if any are selected
+      if (selectedSkills.length > 0) {
+        for (const skill of selectedSkills) {
+          await api.createUserSkill({
+            skill_id: skill.id,
+            is_offered: skill.is_offered
+          });
+        }
       }
 
       toast({
@@ -132,10 +155,6 @@ const ProfileSetup = () => {
       setIsLoading(false);
     }
   };
-
-  if (!user) {
-    return null;
-  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -262,53 +281,60 @@ const ProfileSetup = () => {
               <div className="space-y-6">
                 <div className="space-y-4">
                   <Label className="text-base font-medium">Select your skills</Label>
-                  <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto">
-                    {skills.map((skill) => {
-                      const isSelected = selectedSkills.find(s => s.id === skill.id);
-                      return (
-                        <div key={skill.id} className="space-y-2">
-                          <button
-                            type="button"
-                            onClick={() => handleSkillToggle(skill)}
-                            className={`w-full p-3 rounded-lg border-2 text-left transition-colors ${
-                              isSelected 
-                                ? 'border-primary bg-primary/5' 
-                                : 'border-border hover:border-primary/50'
-                            }`}
-                          >
-                            <div className="font-medium">{skill.name}</div>
-                          </button>
-                          
-                          {isSelected && (
-                            <div className="flex space-x-2">
-                              <button
-                                type="button"
-                                onClick={() => handleSkillTypeChange(skill.id, true)}
-                                className={`flex-1 py-2 px-3 text-xs rounded border ${
-                                  isSelected.is_offered 
-                                    ? 'bg-primary text-primary-foreground border-primary' 
-                                    : 'bg-background border-border'
-                                }`}
-                              >
-                                I can teach
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleSkillTypeChange(skill.id, false)}
-                                className={`flex-1 py-2 px-3 text-xs rounded border ${
-                                  !isSelected.is_offered 
-                                    ? 'bg-primary text-primary-foreground border-primary' 
-                                    : 'bg-background border-border'
-                                }`}
-                              >
-                                I want to learn
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                  {skills.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground mb-4">No skills available at the moment.</p>
+                      <p className="text-sm text-muted-foreground">You can still complete your profile and add skills later.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto">
+                      {skills.map((skill) => {
+                        const isSelected = selectedSkills.find(s => s.id === skill.id);
+                        return (
+                          <div key={skill.id} className="space-y-2">
+                            <button
+                              type="button"
+                              onClick={() => handleSkillToggle(skill)}
+                              className={`w-full p-3 rounded-lg border-2 text-left transition-colors ${
+                                isSelected 
+                                  ? 'border-primary bg-primary/5' 
+                                  : 'border-border hover:border-primary/50'
+                              }`}
+                            >
+                              <div className="font-medium">{skill.name}</div>
+                            </button>
+                            
+                            {isSelected && (
+                              <div className="flex space-x-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSkillTypeChange(skill.id, true)}
+                                  className={`flex-1 py-2 px-3 text-xs rounded border ${
+                                    isSelected.is_offered 
+                                      ? 'bg-primary text-primary-foreground border-primary' 
+                                      : 'bg-background border-border'
+                                  }`}
+                                >
+                                  I can teach
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSkillTypeChange(skill.id, false)}
+                                  className={`flex-1 py-2 px-3 text-xs rounded border ${
+                                    !isSelected.is_offered 
+                                      ? 'bg-primary text-primary-foreground border-primary' 
+                                      : 'bg-background border-border'
+                                  }`}
+                                >
+                                  I want to learn
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
                 
                 {selectedSkills.length > 0 && (
@@ -351,7 +377,7 @@ const ProfileSetup = () => {
                 <Button 
                   onClick={handleComplete} 
                   className="bg-primary"
-                  disabled={isLoading || selectedSkills.length === 0}
+                  disabled={isLoading}
                 >
                   {isLoading ? "Completing..." : "Complete Setup"}
                 </Button>

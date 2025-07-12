@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
 import { Button } from '@/components/ui/button';
@@ -11,65 +11,85 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { X, Plus, Camera } from 'lucide-react';
+import { api } from '@/services/api';
 
 const UserProfile = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    name: 'John Doe',
-    location: 'San Francisco, CA',
-    availability: 'Weekends',
-    profileStatus: 'Public',
-    bio: 'Passionate developer and designer looking to exchange skills and learn from others.',
-    profileImage: 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?w=150&h=150&fit=crop&crop=face'
-  });
-
-  const [skillsOffered, setSkillsOffered] = useState(['JavaScript', 'React', 'UI/UX Design']);
-  const [skillsWanted, setSkillsWanted] = useState(['Python', 'Machine Learning', 'Photography']);
+  const [formData, setFormData] = useState<any>(null);
+  const [skillsOffered, setSkillsOffered] = useState<any[]>([]);
+  const [skillsWanted, setSkillsWanted] = useState<any[]>([]);
   const [newOfferedSkill, setNewOfferedSkill] = useState('');
   const [newWantedSkill, setNewWantedSkill] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  const handleSave = () => {
-    console.log('Saving profile:', { ...formData, skillsOffered, skillsWanted });
+  // Fetch user profile and skills on mount
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const user = await api.getCurrentUser();
+      setFormData({
+        name: `${user.first_name} ${user.last_name}`,
+        location: user.location || '',
+        availability: user.availability || '',
+        profileStatus: user.is_public ? 'Public' : 'Private',
+        bio: user.bio || '',
+        profileImage: user.profile_photo || '',
+      });
+    };
+    const fetchSkills = async () => {
+      const userSkills = await api.getUserSkillList();
+      setSkillsOffered(userSkills.filter((s: any) => s.is_offered).map((s: any) => ({ id: s.id, name: s.skill.name })));
+      setSkillsWanted(userSkills.filter((s: any) => !s.is_offered).map((s: any) => ({ id: s.id, name: s.skill.name })));
+    };
+    Promise.all([fetchProfile(), fetchSkills()]).then(() => setLoading(false));
+  }, []);
+
+  // Save profile changes
+  const handleSave = async () => {
+    if (!formData) return;
+    // Split name into first/last
+    const [first_name, ...rest] = formData.name.split(' ');
+    const last_name = rest.join(' ');
+    await api.updateProfile({
+      first_name,
+      last_name,
+      location: formData.location,
+      availability: formData.availability,
+      is_public: formData.profileStatus === 'Public',
+      bio: formData.bio,
+      // profile_photo: ... (handle upload separately)
+    });
     navigate('/');
   };
 
-  const handleDiscard = () => {
-    navigate('/');
+  // Add/remove skills (backend)
+  const addSkill = async (skillName: string, isOffered: boolean) => {
+    const allSkills = await api.getSkills();
+    const skill = allSkills.find((s: any) => s.name.toLowerCase() === skillName.toLowerCase());
+    if (!skill) return alert('Skill not found');
+    const userSkill = await api.createUserSkill({ skill_id: skill.id, is_offered: isOffered });
+    if (isOffered) setSkillsOffered([...skillsOffered, { id: userSkill.id, name: skill.name }]);
+    else setSkillsWanted([...skillsWanted, { id: userSkill.id, name: skill.name }]);
+    if (isOffered) setNewOfferedSkill(''); else setNewWantedSkill('');
   };
 
-  const addOfferedSkill = () => {
-    if (newOfferedSkill.trim() && !skillsOffered.includes(newOfferedSkill.trim())) {
-      setSkillsOffered([...skillsOffered, newOfferedSkill.trim()]);
-      setNewOfferedSkill('');
-    }
+  const removeSkill = async (userSkillId: number, isOffered: boolean) => {
+    await api.deleteUserSkill(userSkillId);
+    if (isOffered) setSkillsOffered(skillsOffered.filter(s => s.id !== userSkillId));
+    else setSkillsWanted(skillsWanted.filter(s => s.id !== userSkillId));
   };
 
-  const addWantedSkill = () => {
-    if (newWantedSkill.trim() && !skillsWanted.includes(newWantedSkill.trim())) {
-      setSkillsWanted([...skillsWanted, newWantedSkill.trim()]);
-      setNewWantedSkill('');
-    }
-  };
-
-  const removeOfferedSkill = (skill: string) => {
-    setSkillsOffered(skillsOffered.filter(s => s !== skill));
-  };
-
-  const removeWantedSkill = (skill: string) => {
-    setSkillsWanted(skillsWanted.filter(s => s !== skill));
-  };
+  if (loading || !formData) return <div>Loading...</div>;
 
   return (
     <div className="min-h-screen bg-background">
       <Header showTabs={false} />
-      
       {/* Action Bar */}
       <div className="bg-card border-b border-border">
         <div className="container mx-auto px-4 py-3">
           <div className="flex justify-between items-center">
             <h1 className="text-lg font-semibold">Edit Profile</h1>
             <div className="flex space-x-2">
-              <Button onClick={handleDiscard} variant="outline" size="sm">
+              <Button onClick={() => navigate('/')} variant="outline" size="sm">
                 Discard
               </Button>
               <Button onClick={handleSave} size="sm">
@@ -79,7 +99,6 @@ const UserProfile = () => {
           </div>
         </div>
       </div>
-
       <main className="container mx-auto px-4 py-6">
         <div className="max-w-2xl mx-auto space-y-6">
           {/* Profile Photo Section */}
@@ -105,7 +124,6 @@ const UserProfile = () => {
               </div>
             </CardContent>
           </Card>
-
           {/* Basic Information */}
           <Card>
             <CardHeader>
@@ -120,7 +138,6 @@ const UserProfile = () => {
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
                 />
               </div>
-              
               <div className="space-y-2">
                 <Label htmlFor="location">Location</Label>
                 <Input
@@ -129,7 +146,6 @@ const UserProfile = () => {
                   onChange={(e) => setFormData({...formData, location: e.target.value})}
                 />
               </div>
-              
               <div className="space-y-2">
                 <Label htmlFor="bio">Bio</Label>
                 <Textarea
@@ -139,7 +155,6 @@ const UserProfile = () => {
                   rows={3}
                 />
               </div>
-              
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="availability">Availability</Label>
@@ -155,7 +170,6 @@ const UserProfile = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                
                 <div className="space-y-2">
                   <Label htmlFor="profileStatus">Profile Status</Label>
                   <Select value={formData.profileStatus} onValueChange={(value) => setFormData({...formData, profileStatus: value})}>
@@ -171,7 +185,6 @@ const UserProfile = () => {
               </div>
             </CardContent>
           </Card>
-
           {/* Skills Offered */}
           <Card>
             <CardHeader>
@@ -180,32 +193,30 @@ const UserProfile = () => {
             <CardContent>
               <div className="space-y-4">
                 <div className="flex flex-wrap gap-2">
-                  {skillsOffered.map((skill, index) => (
-                    <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                      {skill}
+                  {skillsOffered.map(skill => (
+                    <Badge key={skill.id} variant="secondary" className="flex items-center gap-1">
+                      {skill.name}
                       <X
                         className="h-3 w-3 cursor-pointer hover:text-destructive"
-                        onClick={() => removeOfferedSkill(skill)}
+                        onClick={() => removeSkill(skill.id, true)}
                       />
                     </Badge>
                   ))}
                 </div>
-                
                 <div className="flex gap-2">
                   <Input
                     placeholder="Add a skill you can offer"
                     value={newOfferedSkill}
-                    onChange={(e) => setNewOfferedSkill(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && addOfferedSkill()}
+                    onChange={e => setNewOfferedSkill(e.target.value)}
+                    onKeyPress={e => e.key === 'Enter' && addSkill(newOfferedSkill, true)}
                   />
-                  <Button onClick={addOfferedSkill} size="sm">
+                  <Button onClick={() => addSkill(newOfferedSkill, true)} size="icon">
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
             </CardContent>
           </Card>
-
           {/* Skills Wanted */}
           <Card>
             <CardHeader>
@@ -214,25 +225,24 @@ const UserProfile = () => {
             <CardContent>
               <div className="space-y-4">
                 <div className="flex flex-wrap gap-2">
-                  {skillsWanted.map((skill, index) => (
-                    <Badge key={index} variant="outline" className="flex items-center gap-1">
-                      {skill}
+                  {skillsWanted.map(skill => (
+                    <Badge key={skill.id} variant="secondary" className="flex items-center gap-1">
+                      {skill.name}
                       <X
                         className="h-3 w-3 cursor-pointer hover:text-destructive"
-                        onClick={() => removeWantedSkill(skill)}
+                        onClick={() => removeSkill(skill.id, false)}
                       />
                     </Badge>
                   ))}
                 </div>
-                
                 <div className="flex gap-2">
                   <Input
                     placeholder="Add a skill you want to learn"
                     value={newWantedSkill}
-                    onChange={(e) => setNewWantedSkill(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && addWantedSkill()}
+                    onChange={e => setNewWantedSkill(e.target.value)}
+                    onKeyPress={e => e.key === 'Enter' && addSkill(newWantedSkill, false)}
                   />
-                  <Button onClick={addWantedSkill} size="sm">
+                  <Button onClick={() => addSkill(newWantedSkill, false)} size="icon">
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
